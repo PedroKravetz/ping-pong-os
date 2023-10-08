@@ -5,15 +5,55 @@
 // ****************************************************************************
 // Coloque aqui as suas modificações, p.ex. includes, defines variáveis, 
 // estruturas e funções
+#include <signal.h>
+#include <sys/time.h>
 
-task_t** readyQueue;
-unsigned int initClock;
+struct itimerval timer;
+struct sigaction action;
+
+void tratador (int signum)
+{
+
+}
+
+void task_set_eet (task_t *task, int et){
+    if (task == NULL)
+        task = taskExec;
+    (*task).executionTime = et;
+    (*task).timeRemaining = et - (*task).timeExecuted;
+    scheduler();
+}
+
+int task_get_eet(task_t *task){
+    if (task == NULL)
+        task = taskExec;
+    return (*task).executionTime;
+}
+
+int task_get_ret(task_t *task){
+    if (task == NULL)
+        task = taskExec;
+    return (*task).timeRemaining;
+}
+
+//unsigned int systime (){
+//
+//}
+
 // ****************************************************************************
 
 
 
 void before_ppos_init () {
     // put your customization here
+    action.sa_handler = tratador ;
+    sigemptyset (&action.sa_mask) ;
+    action.sa_flags = 0 ;
+    if (sigaction (SIGALRM, &action, 0) < 0)
+    {
+        perror ("Erro em sigaction: ") ;
+        exit (1) ;
+    }
 #ifdef DEBUG
     printf("\ninit - BEFORE");
 #endif
@@ -21,8 +61,18 @@ void before_ppos_init () {
 
 void after_ppos_init () {
     // put your customization here
-    initClock=0;
-    PRINT_READY_QUEUE;
+    // ajusta valores do temporizador
+    timer.it_value.tv_usec = 1 ;      // primeiro disparo, em micro-segundos
+    timer.it_value.tv_sec  = 0 ;      // primeiro disparo, em segundos
+    timer.it_interval.tv_usec = 1 ;   // disparos subsequentes, em micro-segundos
+    timer.it_interval.tv_sec  = 0 ;   // disparos subsequentes, em segundos
+
+    // arma o temporizador ITIMER_REAL (vide man setitimer)
+    if (setitimer (ITIMER_REAL, &timer, 0) < 0)
+    {
+        perror ("Erro em setitimer: ") ;
+        exit (1) ;
+    }
 #ifdef DEBUG
     printf("\ninit - AFTER");
 #endif
@@ -39,6 +89,8 @@ void after_task_create (task_t *task ) {
     // put your customization here
     (*task).timeExecuted = 0;
     (*task).timeRemaining = 0;
+    (*task).executionTime = 99999;
+    (*task).flagUser = 1;
 #ifdef DEBUG
     printf("\ntask_create - AFTER - [%d]", task->id);
 #endif
@@ -407,11 +459,11 @@ task_t * scheduler() {
     int min;
     int id;
     task_t * aux;
+    task_yield();
     if (readyQueue != NULL) {
-        task_suspend(readyQueue[0], readyQueue);
-        min = (readyQueue[0])->timeRemaining;
-        id = (readyQueue[0])->id;
-        aux = readyQueue[0];
+        min = (readyQueue)->timeRemaining;
+        id = (readyQueue)->id;
+        aux = readyQueue;
         while ((*aux).next != NULL){
             aux = (*aux).next;
             if ((*aux).timeRemaining < min){
@@ -419,8 +471,8 @@ task_t * scheduler() {
                 id = (*aux).id;
             }
         }
-        if (id != (readyQueue[0])->id){
-            aux = readyQueue[0];
+        if (id != (readyQueue)->id){
+            aux = readyQueue;
             while ((*aux).id != id){
                 aux = (*aux).next;
             }
@@ -430,37 +482,12 @@ task_t * scheduler() {
                 (*aux).next = (*aux).prev;
                 (*aux).prev = (*aux).prev->prev;
             }
-            readyQueue[0] = aux;
+            readyQueue = aux;
         }
-        return readyQueue[0];
+        return readyQueue;
     }
     
     return NULL;
 }
 
-void task_set_eet (task_t *task, int et){
-    if (task == NULL)
-        task = readyQueue[0];
-    (*task).executionTime = et;
-    (*task).timeRemaining = et - (*task).timeExecuted;
-    (readyQueue[0])->prev = task;
-    (*task).next = readyQueue[0];
-    readyQueue[0] = task;
-    scheduler();
-}
 
-int task_get_eet(task_t *task){
-    if (task == NULL)
-        task = readyQueue[0];
-    return (*task).executionTime;
-}
-
-int task_get_ret(task_t *task){
-    if (task == NULL)
-        task = readyQueue[0];
-    return (*task).timeRemaining;
-}
-
-//unsigned int systime (){
-//
-//}
