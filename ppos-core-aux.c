@@ -6,7 +6,8 @@
 // Coloque aqui as suas modificações, p.ex. includes, defines variáveis, 
 // estruturas e funções
 
-
+task_t** readyQueue;
+unsigned int initClock;
 // ****************************************************************************
 
 
@@ -20,6 +21,8 @@ void before_ppos_init () {
 
 void after_ppos_init () {
     // put your customization here
+    initClock=0;
+    PRINT_READY_QUEUE;
 #ifdef DEBUG
     printf("\ninit - AFTER");
 #endif
@@ -34,6 +37,8 @@ void before_task_create (task_t *task ) {
 
 void after_task_create (task_t *task ) {
     // put your customization here
+    (*task).timeExecuted = 0;
+    (*task).timeRemaining = 0;
 #ifdef DEBUG
     printf("\ntask_create - AFTER - [%d]", task->id);
 #endif
@@ -133,6 +138,7 @@ int before_task_join (task_t *task) {
 
 int after_task_join (task_t *task) {
     // put your customization here
+
 #ifdef DEBUG
     printf("\ntask_join - AFTER - [%d]", taskExec->id);
 #endif
@@ -397,11 +403,64 @@ int after_mqueue_msgs (mqueue_t *queue) {
 }
 
 task_t * scheduler() {
-    // FCFS scheduler
-    if ( readyQueue != NULL ) {
-        return readyQueue;
+    // SRTF scheduler
+    int min;
+    int id;
+    task_t * aux;
+    if (readyQueue != NULL) {
+        task_suspend(readyQueue[0], readyQueue);
+        min = (readyQueue[0])->timeRemaining;
+        id = (readyQueue[0])->id;
+        aux = readyQueue[0];
+        while ((*aux).next != NULL){
+            aux = (*aux).next;
+            if ((*aux).timeRemaining < min){
+                min = (*aux).timeRemaining;
+                id = (*aux).id;
+            }
+        }
+        if (id != (readyQueue[0])->id){
+            aux = readyQueue[0];
+            while ((*aux).id != id){
+                aux = (*aux).next;
+            }
+            while ((*aux).prev != NULL){
+                (*aux).next->prev=(*aux).prev;
+                (*aux).prev->next=(*aux).next;
+                (*aux).next = (*aux).prev;
+                (*aux).prev = (*aux).prev->prev;
+            }
+            readyQueue[0] = aux;
+        }
+        return readyQueue[0];
     }
+    
     return NULL;
 }
 
+void task_set_eet (task_t *task, int et){
+    if (task == NULL)
+        task = readyQueue[0];
+    (*task).executionTime = et;
+    (*task).timeRemaining = et - (*task).timeExecuted;
+    (readyQueue[0])->prev = task;
+    (*task).next = readyQueue[0];
+    readyQueue[0] = task;
+    scheduler();
+}
 
+int task_get_eet(task_t *task){
+    if (task == NULL)
+        task = readyQueue[0];
+    return (*task).executionTime;
+}
+
+int task_get_ret(task_t *task){
+    if (task == NULL)
+        task = readyQueue[0];
+    return (*task).timeRemaining;
+}
+
+//unsigned int systime (){
+//
+//}
