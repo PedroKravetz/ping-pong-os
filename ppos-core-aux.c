@@ -11,9 +11,20 @@
 struct itimerval timer;
 struct sigaction action;
 
-void tratador (int signum)
-{
-
+void tratador (int signum){
+    systemTime++;
+    task_t *aux = readyQueue;
+    while (aux != NULL){
+        aux->running_time++;
+        aux = aux->next;
+    }
+    taskExec->running_time++;
+    taskExec->timeExecuted++;
+    taskExec->quantum--;
+    if (taskExec->quantum==0){
+        task_yield();
+        scheduler();
+    }
 }
 
 void task_set_eet (task_t *task, int et){
@@ -36,9 +47,9 @@ int task_get_ret(task_t *task){
     return (*task).timeRemaining;
 }
 
-//unsigned int systime (){
-//
-//}
+unsigned int systime (){
+    return systemTime;
+}
 
 // ****************************************************************************
 
@@ -73,6 +84,7 @@ void after_ppos_init () {
         perror ("Erro em setitimer: ") ;
         exit (1) ;
     }
+    systemTime=0;
 #ifdef DEBUG
     printf("\ninit - AFTER");
 #endif
@@ -88,9 +100,11 @@ void before_task_create (task_t *task ) {
 void after_task_create (task_t *task ) {
     // put your customization here
     (*task).timeExecuted = 0;
+    (*task).running_time = 0;
     (*task).timeRemaining = 0;
     (*task).executionTime = 99999;
     (*task).flagUser = 1;
+    scheduler();
 #ifdef DEBUG
     printf("\ntask_create - AFTER - [%d]", task->id);
 #endif
@@ -484,6 +498,7 @@ task_t * scheduler() {
             }
             readyQueue = aux;
         }
+        readyQueue->quantum=20;
         return readyQueue;
     }
     

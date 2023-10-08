@@ -30,6 +30,8 @@ typedef struct task_t
    unsigned int timeExecuted;
    unsigned int running_time;
    int flagUser;  // se 0 não é tarefa de usuário ou 1 se for
+   int quantum;
+   
 } task_t ;
 
 // estrutura que define um semáforo
