@@ -27,11 +27,11 @@ typedef struct task_t
    // ... (outros campos deve ser adicionados APOS esse comentario)
    unsigned int timeRemaining;
    unsigned int executionTime;
-   unsigned int timeExecuted;
    unsigned int running_time;
+   unsigned int time_alive;
    int flagUser;  // se 0 não é tarefa de usuário ou 1 se for
    int quantum;
-   
+   unsigned int activations;
 } task_t ;
 
 // estrutura que define um semáforo

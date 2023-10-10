@@ -12,27 +12,25 @@ struct itimerval timer;
 struct sigaction action;
 
 void tratador (int signum){
+    //print_task();
     systemTime++;
-    task_t *aux = readyQueue;
-    while (aux != NULL){
-        aux->running_time++;
-        aux = aux->next;
-    }
     taskExec->running_time++;
-    taskExec->timeExecuted++;
-    taskExec->quantum--;
-    if (taskExec->quantum==0){
+    taskExec->timeRemaining--;
+    taskExec->quantum-=1;
+    if (taskExec->quantum <= 0 && taskExec->flagUser){
         task_yield();
-        scheduler();
     }
+}
+
+void print_task(){
+    printf("");
 }
 
 void task_set_eet (task_t *task, int et){
     if (task == NULL)
         task = taskExec;
     (*task).executionTime = et;
-    (*task).timeRemaining = et - (*task).timeExecuted;
-    scheduler();
+    (*task).timeRemaining = et - (*task).timeRemaining;
 }
 
 int task_get_eet(task_t *task){
@@ -45,10 +43,6 @@ int task_get_ret(task_t *task){
     if (task == NULL)
         task = taskExec;
     return (*task).timeRemaining;
-}
-
-unsigned int systime (){
-    return systemTime;
 }
 
 // ****************************************************************************
@@ -72,11 +66,12 @@ void before_ppos_init () {
 
 void after_ppos_init () {
     // put your customization here
+    printf("PPOS initialized successfully...");
     // ajusta valores do temporizador
-    timer.it_value.tv_usec = 1 ;      // primeiro disparo, em micro-segundos
-    timer.it_value.tv_sec  = 0 ;      // primeiro disparo, em segundos
-    timer.it_interval.tv_usec = 1 ;   // disparos subsequentes, em micro-segundos
-    timer.it_interval.tv_sec  = 0 ;   // disparos subsequentes, em segundos
+    timer.it_value.tv_usec = 1000;      // primeiro disparo, em micro-segundos
+    timer.it_value.tv_sec  = 0;      // primeiro disparo, em segundos
+    timer.it_interval.tv_usec = 1000;   // disparos subsequentes, em micro-segundos
+    timer.it_interval.tv_sec  = 0;   // disparos subsequentes, em segundos
 
     // arma o temporizador ITIMER_REAL (vide man setitimer)
     if (setitimer (ITIMER_REAL, &timer, 0) < 0)
@@ -85,6 +80,8 @@ void after_ppos_init () {
         exit (1) ;
     }
     systemTime=0;
+    taskDisp->flagUser = 0;
+    taskMain->flagUser = 1;
 #ifdef DEBUG
     printf("\ninit - AFTER");
 #endif
@@ -99,12 +96,13 @@ void before_task_create (task_t *task ) {
 
 void after_task_create (task_t *task ) {
     // put your customization here
-    (*task).timeExecuted = 0;
     (*task).running_time = 0;
+    (*task).time_alive = systemTime;
     (*task).timeRemaining = 0;
     (*task).executionTime = 99999;
     (*task).flagUser = 1;
-    scheduler();
+    (*task).quantum = 20;
+    (*task).activations = 0;
 #ifdef DEBUG
     printf("\ntask_create - AFTER - [%d]", task->id);
 #endif
@@ -112,6 +110,7 @@ void after_task_create (task_t *task ) {
 
 void before_task_exit () {
     // put your customization here
+   printf("\nTask %d exit: execution time %u ms, processor time %u ms, %u activations\n", taskExec->id, (systemTime-taskExec->time_alive), taskExec->running_time, taskExec->activations);
 #ifdef DEBUG
     printf("\ntask_exit - BEFORE - [%d]", taskExec->id);
 #endif
@@ -119,6 +118,7 @@ void before_task_exit () {
 
 void after_task_exit () {
     // put your customization here
+
 #ifdef DEBUG
     printf("\ntask_exit - AFTER- [%d]", taskExec->id);
 #endif
@@ -133,6 +133,7 @@ void before_task_switch ( task_t *task ) {
 
 void after_task_switch ( task_t *task ) {
     // put your customization here
+    taskExec->activations++;
 #ifdef DEBUG
     printf("\ntask_switch - AFTER - [%d -> %d]", taskExec->id, task->id);
 #endif
@@ -472,34 +473,22 @@ task_t * scheduler() {
     // SRTF scheduler
     int min;
     int id;
-    task_t * aux;
-    task_yield();
+    task_t * aux, *auxMin;
     if (readyQueue != NULL) {
         min = (readyQueue)->timeRemaining;
         id = (readyQueue)->id;
         aux = readyQueue;
-        while ((*aux).next != NULL){
+        auxMin = aux;
+        aux= aux->next;
+        while ((*aux).id != id){
             aux = (*aux).next;
             if ((*aux).timeRemaining < min){
                 min = (*aux).timeRemaining;
-                id = (*aux).id;
+                auxMin = aux;
             }
         }
-        if (id != (readyQueue)->id){
-            aux = readyQueue;
-            while ((*aux).id != id){
-                aux = (*aux).next;
-            }
-            while ((*aux).prev != NULL){
-                (*aux).next->prev=(*aux).prev;
-                (*aux).prev->next=(*aux).next;
-                (*aux).next = (*aux).prev;
-                (*aux).prev = (*aux).prev->prev;
-            }
-            readyQueue = aux;
-        }
-        readyQueue->quantum=20;
-        return readyQueue;
+        auxMin->quantum=20;
+        return auxMin;
     }
     
     return NULL;
