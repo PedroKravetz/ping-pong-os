@@ -23,7 +23,13 @@ void tratador (int signum){
 }
 
 void print_task(){
-    printf("");
+    printf("TaskExec ID: %d\n", taskExec->id);
+    printf("TaskExec Time Remaining: %d\n", taskExec->timeRemaining);
+    printf("TaskExec Execution Time: %d\n", taskExec->executionTime);
+    printf("TaskExec Running Time: %d\n", taskExec->running_time);
+    printf("TaskExec Flag User: %d\n", taskExec->flagUser);
+    printf("TaskExec quantum: %d\n", taskExec->quantum);
+    printf("TaskExec activations: %d\n\n", taskExec->activations);
 }
 
 void task_set_eet (task_t *task, int et){
@@ -66,7 +72,7 @@ void before_ppos_init () {
 
 void after_ppos_init () {
     // put your customization here
-    printf("PPOS initialized successfully...");
+    printf("PPOS initialized successfully...\n");
     // ajusta valores do temporizador
     timer.it_value.tv_usec = 1000;      // primeiro disparo, em micro-segundos
     timer.it_value.tv_sec  = 0;      // primeiro disparo, em segundos
@@ -81,7 +87,9 @@ void after_ppos_init () {
     }
     systemTime=0;
     taskDisp->flagUser = 0;
-    taskMain->flagUser = 1;
+    taskMain->flagUser = 0;
+    taskDisp->timeRemaining = 99999;
+    taskMain->timeRemaining = 99999;
 #ifdef DEBUG
     printf("\ninit - AFTER");
 #endif
@@ -129,6 +137,7 @@ void before_task_switch ( task_t *task ) {
 #ifdef DEBUG
     printf("\ntask_switch - BEFORE - [%d -> %d]", taskExec->id, task->id);
 #endif
+    //printf("\ntask_switch - BEFORE - [%d -> %d] Fila Prontos=%d", taskExec->id, task->id, queue_size(readyQueue));
 }
 
 void after_task_switch ( task_t *task ) {
@@ -137,6 +146,7 @@ void after_task_switch ( task_t *task ) {
 #ifdef DEBUG
     printf("\ntask_switch - AFTER - [%d -> %d]", taskExec->id, task->id);
 #endif
+    //printf("\ntask_switch - AFTER - [%d -> %d] Fila Prontos=%d", taskExec->id, task->id, queue_size(readyQueue));
 }
 
 void before_task_yield () {
@@ -481,11 +491,11 @@ task_t * scheduler() {
         auxMin = aux;
         aux= aux->next;
         while ((*aux).id != id){
-            aux = (*aux).next;
             if ((*aux).timeRemaining < min){
                 min = (*aux).timeRemaining;
                 auxMin = aux;
             }
+            aux = (*aux).next;
         }
         auxMin->quantum=20;
         return auxMin;
